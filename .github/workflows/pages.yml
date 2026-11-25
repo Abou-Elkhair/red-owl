@@ -1,0 +1,41 @@
+name: Publish Red Owl website
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage static pages and verified project media
+        run: |
+          set -eu
+          mkdir -p site/assets
+          cp -R index.html ar en site/
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/site.zip" https://github.com/Abou-Elkhair/red-owl/releases/download/v0.1.0/RED-OWL-local.zip
+          echo "75d3e1635cca0e7a32ff827267f9f8fe51854e2ef27b8f2c8805de749c15d55c  $RUNNER_TEMP/site.zip" | sha256sum --check
+          unzip -q "$RUNNER_TEMP/site.zip" 'red-owl/assets/photos/*' 'red-owl/assets/fonts/*' 'red-owl/assets/company-profile.pdf' 'red-owl/assets/middor.webm' -d "$RUNNER_TEMP/media"
+          cp -R "$RUNNER_TEMP/media/red-owl/assets/." site/assets/
+          cp assets/site.css assets/site.js site/assets/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - name: Publish website
+        id: publish
+        uses: actions/deploy-pages@v4
